@@ -32,6 +32,7 @@ When you work with spatial data, essentially you use two types of data:
 1) vector data (i.e., shapefiles): stores the geometric location and attribute information of geographic features. These can be represented by points, lines, or polygons (areas). 
 2) matricial data (i.e., raster): consists of a matrix of cells (or pixels) organized into rows and columns (or a grid) where each cell contains a value representing information. They can be categorical or continuous and have multiple bands. 
 
+For more information on the tree cover datasets, please see: https://earthenginepartners.appspot.com/science-2013-global-forest/download_v1.2.html
 
 ```{r echo=TRUE}
 
@@ -171,7 +172,7 @@ cellStats(s, "sum") # outputs a value per raster
 
 # Cell statistics - calculate several statistics per pixel  (i.e., sum, mean, median)
 par(mfrow=c(2,2))
-plot(r1, main ="Random 1")
+plot(r, main ="Random 1")
 plot(r2, main ="Random 2")
 plot(r3, main ="Random 3")
 plot(overlay(s, fun="mean"), main="Average Values") # outputs a new raster

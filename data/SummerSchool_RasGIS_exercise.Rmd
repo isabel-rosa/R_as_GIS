@@ -1,0 +1,290 @@
+---
+title: "R as a GIS system"
+author: "Isabel Rosa"
+date: "22/08/2018"
+output: html_document
+---
+
+## Install and/or Load Packages
+There are several packages useful to work with spatial data in R. In this short session we'll work with three:
+sp: for working with vector data,
+rgdal: for manipulating spatial data, such as changing coordinate systems
+raster: for working with raster data
+
+```{r echo=TRUE}
+
+# if you need to install first any of the packages, use the following commands
+#install.packages("raster")
+#install.packages("rgdal")
+#install.packages("sp")
+#install.packages("gstat")
+
+# load packages
+library(raster)
+library(rgdal)
+library(sp)
+
+```
+
+## Shapefiles and Raster
+When you work with spatial data, essentially you use two types of data:
+
+1) vector data (i.e., shapefiles): stores the geometric location and attribute information of geographic features. These can be represented by points, lines, or polygons (areas). 
+2) matricial data (i.e., raster): consists of a matrix of cells (or pixels) organized into rows and columns (or a grid) where each cell contains a value representing information. They can be categorical or continuous and have multiple bands. 
+
+For more information on the tree cover datasets, please see: https://earthenginepartners.appspot.com/science-2013-global-forest/download_v1.2.html
+
+```{r echo=TRUE}
+
+# read in shapefile using rgdal
+sc <- readOGR(".", "SantaCatarina")
+
+# import municipalities and settlements shapefiles
+#sc_mun <- ## ADD CODE HERE
+#br_sett <- ## ADD CODE HERE
+
+# always good to check the contents of your dat
+#str(br_sett)
+
+# visualize one of the variables
+spplot(sc_mun, z="Shape_Area", main = "Municipality Area (km2)")
+
+# read in raster
+tc<-raster("tree_cover.tif")
+
+# import loss and gain rasters here
+#now import the loss raster
+#tl<-## ADD CODE HERE
+
+#now import the gain raster
+#tg<-## ADD CODE HERE
+
+# for multiple band rasters, you can choose to import just one or all bands
+#r2 <- raster("tree_cover_multi.tif", band=2)
+
+# note that the value 255, which is Hansen's nodata value was not recognized as such
+NAvalue(tg) # check first
+NAvalue(tc)<-255 #fix it by forcing 255 to be the nodata
+# repeat for tl and tg
+## ADD CODE HERE
+
+
+# visualize all rasters
+## ADD CODE HERE
+
+# hint: to visualize one plot(tg, main = "Tree Cover Gain (binary)")
+
+```
+
+## Reference systems
+Coordinate systems are essential to understand when working with spatial data. Some reading material on this can be found here: 
+Essentially, if one wants to know which position of the Earth we refer to, coordinates of geospatial data require a reference system:
+
+1) geodesic/geographic coordinates need an order (lat/long), a unit (e.g., degrees) and a datum (a reference ellipsoid: e.g. WGS84)
+2) cartesian/projected coordinates (e.g. UTM, web Mercator) need also measurement units (e.g., meters), and some way of encoding how they relate to geodesic coordinates, in which datum (this is handled by the GIS system)
+
+
+```{r echo=FALSE}
+
+# check the coordinate system of your shapefile
+proj4string(sc)
+
+# check for all others, they should all be the same! 
+## ADD CODE HERE
+
+#if missing: assign coordinates
+#proj4string(s1) <- CRS("+proj=utm +zone=19 +ellps=GRS80 +datum=NAD83")
+
+#if different: transforms coordinates
+#sc.wgs <- spTransform(sc, CRS("+proj=longlat +datum=WGS84"))
+
+# check the coordinate system of the rasters
+## ADD CODE HERE
+
+```
+
+## Operations with Shapefiles
+
+Clip: in R you can clip using the command "intersect", so that intersect(feature to be clipped, clip feature)
+Select: you can use a boolean selection to subset the features of your shapefile, for instance if you just want to look at settlements with a mininum number of habitants, so that Population > median(Population) 
+There are several options, have a look at this great tutorial: http://www.rspatial.org/spatial/rst/7-vectmanip.html
+
+```{r echo=TRUE}
+
+# Clip the settlement features using the Santa Catarina shapefile
+sc_sett<-intersect(br_sett, sc)
+
+#sc_sett$med <- sc_sett$population > median(sc_sett$population) # oops! annoyingly our population values have been stored as factors
+
+# convert to original numerical values
+sc_sett$population<-as.numeric(as.vector(sc_sett$population))
+# careful! applying as.numeric alone it will not work!!
+
+# visualize results
+## ADD CODE HERE
+
+# select settlements larger then the median value
+sc_sett$med <- sc_sett$population > median(sc_sett$population)
+sc_largesett <- sc_sett[sc_sett$med == 1, ]
+
+# visualize results
+par(mfrow=c(1,2))
+plot(sc_sett, main = "All Settlements")
+plot(sc_largesett, main = "Largest Settlements")
+
+# now you can do it yourself
+# select top 20 settlements and visualize them
+## ADD CODE HERE
+
+```
+
+
+## Operations with Rasters
+There are many operations you can do with rasters, and these are more frequently used in spatial analyses than shapefiles. Here I will just illustrate a couple of simple operations: 
+- Global/Raster statistics - obtain a value that summarizes the whole raster layer
+- Cell statistics (pixel-by-pixel operation): obtains a value per pixel
+- Focal statistics (operation that takes into account neighborhood of central cell) - results in raster of same of different size
+- Zonal statistics - calculates summary statistics of a give raster (e.g., elevation) based on pre-defined zones (e.g., admnistrative boundaries, biomes). Outputs a table with the values per zone. 
+For more great examples, have a look here: http://www.rspatial.org/spatial/rst/8-rastermanip.html
+
+```{r echo=TRUE}
+
+# sum the loss and gain rasters to know where there was simultaneous loss and gain in Santa Catarina
+tclg<-tl+tg 
+par(mfrow=c(1,3))
+plot(tl, main = "Forest Loss")
+plot(tg, main = "Forest Gain")
+plot(tclg, main = "Forest Loss and Gain")
+
+# you can also try to create three new rasters and work with them
+# create a new raster
+r <- raster(ncol=10, nrow=10, xmx=-80, xmn=-150, ymn=20, ymx=60)
+values(r) <- runif(ncell(r)) # assign random values
+#plot(r)
+
+# create two more rasters based on the first one
+r2 <- r * r
+r3  <- sqrt(r)
+
+# either stack or brick them
+s <- stack(r, r2, r3)
+#b <- brick(s)
+
+# Raster statistics - calculate several statistics per raster layer (i.e., sum, mean, median)
+cellStats(s, "sum") # outputs a value per raster
+#obtain other statistics, such as mean, median, IQR and stdev
+## ADD CODE HERE
+
+
+# Cell statistics - calculate several statistics per pixel  (i.e., sum, mean, median)
+par(mfrow=c(2,2))
+plot(r, main ="Random 1")
+plot(r2, main ="Random 2")
+plot(r3, main ="Random 3")
+plot(overlay(s, fun="mean"), main="Average Values") # outputs a new raster
+
+# Focal statistics - calculate mean accounting for the neighborhood values, compare with previous outcome 
+f1 <- focal(tc, w=matrix(1,nrow=5,ncol=5) , fun=mean)
+plot(f1, main = "Average forest cover 5x5")
+# sum the loss, vary window size
+f2 <- focal(tl, w=matrix(1,nrow=5,ncol=5) , fun=sum)
+plot(f2, main = "Total forest loss 5x5")
+# sum the gain, vary window size
+f3 <- focal(tg, w=matrix(1,nrow=5,ncol=5) , fun=sum)
+plot(f3, main = "Total forest gain 5x5")
+
+# plot 4 maps with different window sizes
+par(mfrow=c(2,2))
+for(i in c(5,15,25,55)){
+  f_w <- focal(tc, w=matrix(1,nrow=i,ncol=i) , fun=sum)
+  plot(f_w, main = paste0("Window size: ", i))
+}
+
+# Zonal Statistics - using two rasters
+sc_tc_mean_loss <- zonal(tc, tl, fun=mean) #average tree cover in loss areas
+sc_tc_mean_gain <- zonal(tc, tg, fun=mean) #average tree cover in gain areas
+
+# average tree cover loss
+sc_tc_mean_loss
+
+# average tree cover gain
+sc_tc_mean_gain
+
+
+# now you can try it yourself
+# create 100 random rasters, and then
+# 1)  get the average value for each one
+# 2)  get a raster that shows the standard deviation per pixel 
+## ADD CODE HERE
+  
+```
+
+
+## Operations with both Rasters and Shapefiles
+Here I'll show a couple of examples of operation that use feature data as inputs and output rasters:
+Distance to features - calculates the euclidean distance from each cell/pixel to the closest feature (e.g., roads, settlements). Outputs a raster file with these distances.
+Interpolation: a world in itself! Very vey short example provided here (based on a single method, IDW), please see more here: http://www.rspatial.org/analysis/rst/4-interpolation.html
+To better understand interpolation I advise you to read first about spatial autocorrelation: http://www.rspatial.org/analysis/rst/3-spauto.html
+
+To use interpolation metrics you need to load another packaged called gstat
+Inverse distance weighted (IDW) - See more also here: http://desktop.arcgis.com/en/arcmap/10.3/tools/3d-analyst-toolbox/how-idw-works.htm
+
+```{r echo=TRUE}
+
+# create an empty raster (little trick using existing raster)
+dist_sett<-tc*0
+# or you can create an empty one like before
+# dist_sett <- raster(ncol=ncol(tc), nrow=nrow(tc), xmx=extent(tc)@xmax, xmn=extent(tc)@xmin, ymn=extent(tc)@ymin, ymx=extent(tc)@ymax)
+
+# Distance to points
+dist_sett <- distanceFromPoints(dist_sett, sc_sett)
+
+# now try it with the distance to the top 20 settlements that you calculated above
+## ADD CODE HERE
+
+# you can then mask the outside area of Santa Catarina
+dist_sett <- mask(dist_sett, tc)
+
+# plot results
+plot(dist_sett, main = "Distance to settlements (m)")
+
+# load gstat
+library(gstat)
+
+# create empty raster
+idw_sett<-tc*0
+
+# compute the model, see reference for more detail
+gs <- gstat(formula=population~1, locations=sc_sett, nmax=5, set=list(idp = 2))
+idw_out <- interpolate(idw_sett, gs)
+
+## [inverse distance weighted interpolation]
+sc_pop <- mask(idw_out, tc)
+plot(sc_pop, main = "Santa Catarina Population")
+
+# now you can try different idw combinations
+# 1) what's the difference if you increase the number of points?
+# 2) what's the difference if you increase the power parameter (idp)?
+## ADD CODE HERE
+
+```
+
+
+## Export Shapefiles and Rasters
+It's very easy to export both shapefiles and rasters from R to be visualized in QGIS or ArcMap. 
+
+```{r echo=TRUE}
+
+# Save feature layers (point, polygon, polyline) to shapefile 
+writeOGR(sc_largesett, dsn=".", layer="SC_largeSett", driver="ESRI Shapefile" )
+
+# or 
+#shapefile(sc_largesett, "SC_largeSett.shp", overwrite=TRUE) 
+
+#Exporting raster
+writeRaster(sc_pop, filename="SC_popmap", format="GTiff" )
+
+## Export the shapefiles and rasters you created
+## ADD CODE HERE
+
+```
