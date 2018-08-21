@@ -35,7 +35,7 @@ When you work with spatial data, essentially you use two types of data:
 
 ```{r echo=TRUE}
 
-# read in shapefile usign rgdal
+# read in shapefile using rgdal
 sc <- readOGR(".", "SantaCatarina")
 
 # import municipalities and settlements shapefiles
@@ -112,17 +112,17 @@ There are several options, have a look at this great tutorial: http://www.rspati
 # Clip the settlement features using the Santa Catarina shapefile
 sc_sett<-intersect(br_sett, sc)
 
-# visualize results
-par(mfrow=c(1,2))
-plot(sc_sett, main = "Settlements in Santa Catarina")
-spplot(sc_sett, z="population", main = "Population per Settlement (people)")
-
-# Dissolve features based on a certain selection
 #sc_sett$med <- sc_sett$population > median(sc_sett$population) # oops! annoyingly our population values have been stored as factors
 
 # convert to original numerical values
 sc_sett$population<-as.numeric(as.vector(sc_sett$population))
 # careful! applying as.numeric alone it will not work!!
+
+# visualize results
+plot(sc_sett, main = "Settlements in Santa Catarina")
+spplot(sc_sett, z="population", main = "Population per Settlement (people)")
+
+# select settlements larger then the median value
 sc_sett$med <- sc_sett$population > median(sc_sett$population)
 sc_largesett <- sc_sett[sc_sett$med == 1, ]
 
@@ -147,12 +147,16 @@ For more great examples, have a look here: http://www.rspatial.org/spatial/rst/8
 
 # sum the loss and gain rasters to know where there was simultaneous loss and gain in Santa Catarina
 tclg<-tl+tg 
+par(mfrow=c(1,3))
+plot(tl, main = "Forest Loss")
+plot(tg, main = "Forest Gain")
+plot(tclg, main = "Forest Loss and Gain")
 
 # you can also try to create three new rasters and work with them
 # create a new raster
 r <- raster(ncol=10, nrow=10, xmx=-80, xmn=-150, ymn=20, ymx=60)
 values(r) <- runif(ncell(r)) # assign random values
-plot(r)
+#plot(r)
 
 # create two more rasters based on the first one
 r2 <- r * r
@@ -166,17 +170,21 @@ s <- stack(r, r2, r3)
 cellStats(s, "sum") # outputs a value per raster
 
 # Cell statistics - calculate several statistics per pixel  (i.e., sum, mean, median)
-plot(overlay(s, fun="mean")) # outputs a new raster
+par(mfrow=c(2,2))
+plot(r1, main ="Random 1")
+plot(r2, main ="Random 2")
+plot(r3, main ="Random 3")
+plot(overlay(s, fun="mean"), main="Average Values") # outputs a new raster
 
 # Focal statistics - calculate mean accounting for the neighborhood values, compare with previous outcome 
 f1 <- focal(tc, w=matrix(1,nrow=5,ncol=5) , fun=mean)
-plot(f1)
+plot(f1, main = "Average forest cover 5x5")
 # sum the loss, vary window size
 f2 <- focal(tl, w=matrix(1,nrow=5,ncol=5) , fun=sum)
-plot(f2)
+plot(f2, main = "Total forest loss 5x5")
 # sum the gain, vary window size
 f3 <- focal(tg, w=matrix(1,nrow=5,ncol=5) , fun=sum)
-plot(f3)
+plot(f3, main = "Total forest gain 5x5")
 
 # plot 4 maps with different window sizes
 par(mfrow=c(2,2))
@@ -194,14 +202,11 @@ sc_tc_mean_loss
 
 # average tree cover gain
 sc_tc_mean_gain
-
-
   
 ```
 
 
 ## Operations with both Rasters and Shapefiles
-
 Here I'll show a couple of examples of operation that use feature data as inputs and output rasters:
 Distance to features - calculates the euclidean distance from each cell/pixel to the closest feature (e.g., roads, settlements). Outputs a raster file with these distances.
 Interpolation: a world in itself! Very vey short example provided here (based on a single method, IDW), please see more here: http://www.rspatial.org/analysis/rst/4-interpolation.html
@@ -209,7 +214,6 @@ To better understand interpolation I advise you to read first about spatial auto
 
 To use interpolation metrics you need to load another packaged called gstat
 Inverse distance weighted (IDW) - See more also here: http://desktop.arcgis.com/en/arcmap/10.3/tools/3d-analyst-toolbox/how-idw-works.htm
-
 
 ```{r echo=TRUE}
 
@@ -225,7 +229,7 @@ dist_sett <- distanceFromPoints(dist_sett, sc_sett)
 dist_sett <- mask(dist_sett, tc)
 
 # plot results
-plot(dist_sett)
+plot(dist_sett, main = "Distance to settlements (m)")
 
 # load gstat
 library(gstat)
@@ -237,8 +241,7 @@ idw_out <- interpolate(idw_sett, gs)
 
 ## [inverse distance weighted interpolation]
 sc_pop <- mask(idw_out, tc)
-plot(sc_pop)
-
+plot(sc_pop, main = "Santa Catarina Population")
 
 ```
 
